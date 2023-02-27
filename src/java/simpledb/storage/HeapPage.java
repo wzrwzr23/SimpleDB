@@ -344,6 +344,11 @@ public class HeapPage implements Page {
             public Tuple next() {
                 return tuples[i++];
             }
+
+            @Override
+            public void remove() {
+                throw new UnsupportedOperationException();
+            }
         };
     }
 
