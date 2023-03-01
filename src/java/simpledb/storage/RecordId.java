@@ -3,8 +3,6 @@ package simpledb.storage;
 import java.io.Serializable;
 import java.util.Objects;
 
-import org.hamcrest.core.IsInstanceOf;
-
 /**
  * A RecordId is a reference to a specific tuple on a specific page of a
  * specific table.
@@ -25,7 +23,6 @@ public class RecordId implements Serializable {
      *                the tuple number within the page.
      */
     public RecordId(PageId pid, int tupleno) {
-        // some code goes here
         this.tupleNum = tupleno;
         this.pageId = pid;
     }
@@ -52,7 +49,6 @@ public class RecordId implements Serializable {
      */
     @Override
     public boolean equals(Object o) {
-        // some code goes here
         if (o.equals(this) || o == this)
             return true;
         if (o instanceof RecordId) {

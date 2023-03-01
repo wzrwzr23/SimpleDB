@@ -51,7 +51,7 @@ public class HeapPageId implements PageId {
      *         ids are the same)
      */
     public boolean equals(Object o) {
-        if (o.equals(this))
+        if (o.equals(this) || o == this)
             return true;
         if (o instanceof HeapPageId) {
             HeapPageId comparedHeapPage = (HeapPageId) o;
