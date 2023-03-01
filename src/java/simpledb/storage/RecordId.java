@@ -1,6 +1,9 @@
 package simpledb.storage;
 
 import java.io.Serializable;
+import java.util.Objects;
+
+import org.hamcrest.core.IsInstanceOf;
 
 /**
  * A RecordId is a reference to a specific tuple on a specific page of a
@@ -9,34 +12,36 @@ import java.io.Serializable;
 public class RecordId implements Serializable {
 
     private static final long serialVersionUID = 1L;
+    private int tupleNum;
+    private PageId pageId;
 
     /**
      * Creates a new RecordId referring to the specified PageId and tuple
      * number.
      * 
      * @param pid
-     *            the pageid of the page on which the tuple resides
+     *                the pageid of the page on which the tuple resides
      * @param tupleno
-     *            the tuple number within the page.
+     *                the tuple number within the page.
      */
     public RecordId(PageId pid, int tupleno) {
         // some code goes here
+        this.tupleNum = tupleno;
+        this.pageId = pid;
     }
 
     /**
      * @return the tuple number this RecordId references.
      */
     public int getTupleNumber() {
-        // some code goes here
-        return 0;
+        return tupleNum;
     }
 
     /**
      * @return the page id this RecordId references.
      */
     public PageId getPageId() {
-        // some code goes here
-        return null;
+        return pageId;
     }
 
     /**
@@ -48,7 +53,15 @@ public class RecordId implements Serializable {
     @Override
     public boolean equals(Object o) {
         // some code goes here
-        throw new UnsupportedOperationException("implement this");
+        if (o.equals(this) || o == this)
+            return true;
+        if (o instanceof RecordId) {
+            RecordId comparedRecord = (RecordId) o;
+            return comparedRecord.pageId.equals(this.pageId) &&
+                    comparedRecord.tupleNum == this.tupleNum;
+        }
+
+        return false;
     }
 
     /**
@@ -59,8 +72,7 @@ public class RecordId implements Serializable {
      */
     @Override
     public int hashCode() {
-        // some code goes here
-        throw new UnsupportedOperationException("implement this");
+        return Objects.hash(this.pageId, this.tupleNum);
 
     }
 
