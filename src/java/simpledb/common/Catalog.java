@@ -13,6 +13,8 @@ import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.junit.Test.None;
+
 /**
  * The Catalog keeps track of all available tables in the database and their
  * associated schemas.
@@ -126,7 +128,15 @@ public class Catalog {
         //     }
         // }
         // return TableId;
-        return tableNameMap.get(name);
+        
+        if(name != null){
+            if(tableNameMap.containsKey(name)){
+                return tableNameMap.get(name);
+            }
+            
+        }
+        throw new NoSuchElementException("no such name");
+        
     }
 
     /**
@@ -137,8 +147,10 @@ public class Catalog {
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
         // some code goes here 
-
-        return tableIdMap.get(tableid).getFile().getTupleDesc();
+        if(tableIdMap.containsKey(tableid)){
+            return tableIdMap.get(tableid).getFile().getTupleDesc();
+        }
+        throw new NoSuchElementException("no such table id");
     }
 
     /**
@@ -149,8 +161,11 @@ public class Catalog {
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
         // some code goes here
-        
-        return tableIdMap.get(tableid).getFile();
+        if (tableIdMap.containsKey(tableid)){
+            return tableIdMap.get(tableid).getFile();
+
+        }
+        throw new NoSuchElementException("no such table id, cannot get db file");
     }
 
     public String getPrimaryKey(int tableid) {
