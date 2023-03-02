@@ -9,11 +9,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.junit.Test.None;
 
 /**
  * The Catalog keeps track of all available tables in the database and their

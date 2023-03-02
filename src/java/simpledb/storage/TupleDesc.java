@@ -6,8 +6,6 @@ import simpledb.common.Utility;
 import java.io.Serializable;
 import java.util.*;
 
-import net.sf.antcontrib.design.Log;
-
 /**
  * TupleDesc describes the schema of a tuple.
  */
