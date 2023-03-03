@@ -49,7 +49,7 @@ public class RecordId implements Serializable {
      */
     @Override
     public boolean equals(Object o) {
-        if (o.equals(this) || o == this)
+        if (o == this)
             return true;
         if (o instanceof RecordId) {
             RecordId comparedRecord = (RecordId) o;
