@@ -314,8 +314,8 @@ public class HeapPage implements Page {
      * Returns true if associated slot on this page is filled.
      */
     public boolean isSlotUsed(int i) {
-
-        return ((header[i / 8] >> (i % 8)) & 1) == 1;
+        int index = header[i / 8] >> (i % 8);
+        return (index & 1) == 1;
     }
 
     /**
