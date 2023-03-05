@@ -58,7 +58,7 @@ public class Catalog {
 
     public Catalog() {
         // some code goes here
-        // tableList = new ArrayList<Table>();
+
         tableNameMap = new HashMap<String, Integer>();
         tableIdMap = new HashMap<Integer, Table>();
     }
@@ -75,12 +75,7 @@ public class Catalog {
     public void addTable(DbFile file, String name, String pkeyField) {
         // some code goes here
         Table table = new Table(file, name, pkeyField);
-        // for (Table i : tableList) {
-        //     if(i.getFile().getId() == file.getId() || i.getName() == name){
-        //         this.tableList.remove(i);
-        //     }
-        // }
-        // this.tableList.add(table);
+
         if(tableNameMap.containsKey(name)){
             tableNameMap.replace(name, file.getId());
         }
@@ -117,13 +112,6 @@ public class Catalog {
      */
     public int getTableId(String name) throws NoSuchElementException {
         // some code goes here
-        // int TableId = -1;
-        // for (Table i: tableList){
-        //     if(i.getName() == name){
-        //         TableId = i.getFile().getId();
-        //     }
-        // }
-        // return TableId;
         
         if(name != null){
             if(tableNameMap.containsKey(name)){
