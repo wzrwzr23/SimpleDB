@@ -29,7 +29,7 @@ public class BufferPool {
     private static int pageSize = DEFAULT_PAGE_SIZE;
 
     private int numPages;
-    private ConcurrentHashMap<PageId, Page> pageHash;
+    private ConcurrentHashMap<PageId, Page> pagesHashMap;
 
     /**
      * Default number of pages passed to the constructor. This is used by
@@ -45,6 +45,7 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         this.numPages = numPages;
+        this.pagesHashMap = new ConcurrentHashMap<>();
     }
 
     public static int getPageSize() {
@@ -78,21 +79,16 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
             throws TransactionAbortedException, DbException {
-        // some code goes here
-        switch (perm) {
-            case READ_WRITE:
-                if (pageHash.containsKey(pid)) {
-                    return pageHash.get(pid);
-                }
-                throw new TransactionAbortedException();
 
-            // default read only
-            default:
-                if (pageHash.containsKey(pid)) {
-                    return pageHash.get(pid);
-                }
-
-                throw new DbException("Page does not exist in BufferPool.");
+        if (pagesHashMap.containsKey(pid)) {
+            return pagesHashMap.get(pid);
+        } else {
+            Page newPage = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
+            this.pagesHashMap.put(pid, newPage);
+            if (this.pagesHashMap.size() >= this.numPages) {
+                throw new DbException("Pool exceeds max size.");
+            }
+            return newPage;
         }
 
     }
