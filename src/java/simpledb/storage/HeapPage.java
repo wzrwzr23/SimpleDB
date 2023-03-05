@@ -78,8 +78,10 @@ public class HeapPage implements Page {
      */
     private int getNumTuples() {
 
-        return tuples.length;
-
+        int tupleSize = this.td.getSize();
+        Database.getBufferPool();
+        int bufferPoolPageSize = BufferPool.getPageSize();
+        return (int) Math.floor((bufferPoolPageSize * 8) / (tupleSize * 8 + 1));
     }
 
     /**
@@ -90,8 +92,8 @@ public class HeapPage implements Page {
      *         tuple occupying tupleSize bytes
      */
     private int getHeaderSize() {
-
-        return this.header.length;
+        int numTuples = this.getNumTuples();
+        return (int) Math.ceil(numTuples / 8.0);
     }
 
     /**
@@ -299,12 +301,10 @@ public class HeapPage implements Page {
      * Returns the number of empty slots on this page.
      */
     public int getNumEmptySlots() {
-        Iterator<Tuple> it = this.iterator();
         int count = 0;
-        while (it.hasNext()) {
-            if (it.next() == null) {
+        for (int i = 0; i < this.numSlots; i++) {
+            if (!this.isSlotUsed(i))
                 count++;
-            }
         }
         return count;
 
@@ -314,8 +314,8 @@ public class HeapPage implements Page {
      * Returns true if associated slot on this page is filled.
      */
     public boolean isSlotUsed(int i) {
-        return tuples[i] == null;
 
+        return ((header[i / 8] >> (i % 8)) & 1) == 1;
     }
 
     /**
@@ -332,24 +332,12 @@ public class HeapPage implements Page {
      *         (note that this iterator shouldn't return tuples in empty slots!)
      */
     public Iterator<Tuple> iterator() {
-        return new Iterator<Tuple>() {
-            private int i = 0;
-
-            @Override
-            public boolean hasNext() {
-                return tuples.length > i;
+        ArrayList<Tuple> tuplesInUse = new ArrayList<>();
+        for (int i = 0; i < this.getNumTuples(); i++) {
+            if (this.isSlotUsed(i)) {
+                tuplesInUse.add(this.tuples[i]);
             }
-
-            @Override
-            public Tuple next() {
-                return tuples[i++];
-            }
-
-            @Override
-            public void remove() {
-                throw new UnsupportedOperationException();
-            }
-        };
+        }
+        return tuplesInUse.iterator();
     }
-
 }
