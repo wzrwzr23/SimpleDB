@@ -18,8 +18,8 @@
 ### Non-trival Part
 
 #### Exericise 1
-  - `Tuple.java`: we use an `ArrayList<Field>` called `tupleFields` to store a list of fields in one tuple. 
-  - `TupleDesc.java`: we use an `ArrayList<TDItem>` called `tdItemList` to store a list to `TDItem` in a schema.
+  - `Tuple`: We use an `ArrayList<Field>` called `tupleFields` to store a list of fields in one tuple. 
+  - `TupleDesc`: We use an `ArrayList<TDItem>` called `tdItemList` to store a list to `TDItem` in a schema.
     
 #### Exercise 2 
 - `Catalog` constructor initializes two data containers:
