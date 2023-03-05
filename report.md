@@ -11,37 +11,34 @@
 - We declared two attributes required for the initialisation of the `BufferPool`; an integer `numPages` to store the number of pages in the BufferPool and a ConcurrentHashMap `pagesHashMap` to that maps the `PageId` to the `Page` objects to store the pages in the BufferPool. 
 - A ConcurrentHashMap is used as it is threadsafe; we cannot read or insert a page into the page at the same time.
 
-#### Exercise 4: `HeapPageId, RecordId, HeapPage`
-- No new design decisions
-
 #### Exercise 5: `HeapFile`
 
-To create an iterator which iterates through the tuples of each page in the `HeapFile`, we added an inner class `HeapFileIterator` which implements `DbFileIterator` interface.
+- To create an iterator which iterates through the tuples of each page in the `HeapFile`, we added an inner class `HeapFileIterator` which implements `DbFileIterator` interface.
 
 ### Non-trival Part
 
-1. Exericise 1
-    - `Tuple.java`: we use an `ArrayList<Field>` called `tupleFields` to store a list of fields in one tuple. 
-    - `TupleDesc.java`: we use an `ArrayList<TDItem>` called `tdItemList` to store a list to `TDItem` in a schema.
+#### Exericise 1
+  - `Tuple.java`: we use an `ArrayList<Field>` called `tupleFields` to store a list of fields in one tuple. 
+  - `TupleDesc.java`: we use an `ArrayList<TDItem>` called `tdItemList` to store a list to `TDItem` in a schema.
     
-2. Exercise 2 
+#### Exercise 2 
 - `Catalog` constructor initializes two data containers:
     - `tableNameMap`: A hash map that maps table name to table ID	
     - `tableIdMap`: A hash map that maps table ID to a table object
 
-3. Exercise 3
+#### Exercise 3
 - `getPage()`
     - If the page does not exist in the pool, we have to fetch it using `Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid)`
     - Additionally, we have to check if the size after adding the `newPage` exceeds the max number of Pages `numPage` allowed. Since eviction is not implemented, we throw a `DbException` if so.
 
-5. Exercise 4
+#### Exercise 4
 - `getNumTuples()` 
     - requires calculating the page size in bits and dividing it by the tuple size in bits with an addition of the header bit, according to the formula `_tuples per page_ = floor((_page size_ * 8) / (_tuple size_ * 8 + 1))`
 
 - `isSlotUsed()` 
     - requires tracing the value of the bits that corresponds to the index of the slot to determine whether the slot is used.
 
-5. Exercise 5
+#### Exercise 5
 
 - `readPage()`
     - We use `RandomAccessFile` to random access to the file. We skip `pgNo * pageSize` number of bytes to read the page data.
@@ -50,8 +47,8 @@ To create an iterator which iterates through the tuples of each page in the `Hea
 - `iterator()`
     `HeapFileIterator` class which implements `DbFileIterator` interface is returned. 
 
-6. Exercise 6
-    - `getTupleDesc()`: In order to handle the case where `tableAlias` or `fieldName` are `null`, we used a for-loop with if-else inside to determine if they are `null` and convert `null` to string so that the resulting name can be `null.fieldName`, `tableAlias.null`, or `null.null`.
+#### Exercise 6
+  - `getTupleDesc()`: In order to handle the case where `tableAlias` or `fieldName` are `null`, we used a for-loop with if-else inside to determine if they are `null` and convert `null` to string so that the resulting name can be `null.fieldName`, `tableAlias.null`, or `null.null`.
 
 ### Changes on API
 
