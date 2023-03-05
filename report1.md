@@ -52,8 +52,8 @@
 
 ### Changes on API
 
-- Exercise 1
-    Added one contructor in `TupleDesc.java`: `TupleDesc(ArrayList<TDItem> tdItemList)`
+#### Exercise 1
+- Added one contructor in `TupleDesc.java`: `TupleDesc(ArrayList<TDItem> tdItemList)`
 
 
 ### Incomplete Part
