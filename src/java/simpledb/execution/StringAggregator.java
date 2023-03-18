@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import simpledb.common.Type;
-import simpledb.execution.Aggregator.Op;
 import simpledb.storage.Field;
 import simpledb.storage.IntField;
 import simpledb.storage.Tuple;
@@ -21,9 +20,8 @@ public class StringAggregator implements Aggregator {
     private int gbfield;
     private Type gbfieldType;
     private int afield;
-    private final Op operator = Op.COUNT;
-
     private HashMap<Field, Integer> aggregatedTable = new HashMap<>();
+    private Field placeholderField = new IntField(NO_GROUPING);
 
     /**
      * Aggregate constructor
@@ -53,13 +51,13 @@ public class StringAggregator implements Aggregator {
      * @param tup the Tuple containing an aggregate field and a group-by field
      */
     public void mergeTupleIntoGroup(Tuple tup) {
-        if (this.gbfield == NO_GROUPING) {
+        if (this.gbfield != NO_GROUPING) {
             Field tupleField = tup.getField(this.gbfield);
             Integer aggregatedFieldCount = this.aggregatedTable.getOrDefault(tupleField, 0);
             this.aggregatedTable.put(tupleField, aggregatedFieldCount + 1);
         } else {
-            Integer aggregatedFieldCount = this.aggregatedTable.getOrDefault(afield, 0);
-            this.aggregatedTable.put(null, aggregatedFieldCount + 1);
+            Integer aggregatedFieldCount = this.aggregatedTable.getOrDefault(null, 0);
+            this.aggregatedTable.put(placeholderField, aggregatedFieldCount + 1);
         }
     }
 
@@ -81,7 +79,7 @@ public class StringAggregator implements Aggregator {
             tupleDesc = new TupleDesc(new Type[] { this.gbfieldType, Type.INT_TYPE });
         }
 
-        return new TupleIterator(null, getAggregatedList(tupleDesc));
+        return new TupleIterator(tupleDesc, getAggregatedList(tupleDesc));
     }
 
     private ArrayList<Tuple> getAggregatedList(TupleDesc tupleDesc) {
@@ -92,9 +90,10 @@ public class StringAggregator implements Aggregator {
                 tuple.setField(this.afield, new IntField(aggregatedEntry.getValue()));
             } else {
                 tuple.setField(0, aggregatedEntry.getKey());
-                tuple.setField(this.afield, new IntField(aggregatedEntry.getValue()));
+                tuple.setField(1, new IntField(aggregatedEntry.getValue()));
             }
 
+            aggregatedList.add(tuple);
         }
         return aggregatedList;
 
