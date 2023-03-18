@@ -63,32 +63,41 @@ public class IntegerAggregator implements Aggregator {
         boolean noGrouping = this.gbfield == NO_GROUPING;
         Field tuplefield = PLACEHOLDER_FIELD;
         int tupleValue = ((IntField) tup.getField(this.afield)).getValue();
+
         if (!noGrouping) {
             tuplefield = tup.getField(this.gbfield);
         }
+
         switch (this.operator) {
             case COUNT:
                 int count = this.aggregatedTable.getOrDefault(tuplefield, 0);
                 this.aggregatedTable.put(tuplefield, count + 1);
+
             case SUM:
                 int sum = this.aggregatedTable.getOrDefault(tuplefield, 0);
                 this.aggregatedTable.put(tuplefield, sum + tupleValue);
 
             case AVG:
-                int average = this.aggregatedTable.getOrDefault(tuplefield, 0);
+                int total = this.aggregatedTable.getOrDefault(tuplefield, 0);
                 int fieldCount = this.fieldCountHm.getOrDefault(tuplefield, 0);
-                int newAverage = average + tupleValue / (fieldCount + 1);
-                this.aggregatedTable.put(tuplefield, newAverage);
+                this.aggregatedTable.put(tuplefield, total + tupleValue);
+                this.fieldCountHm.put(tuplefield, fieldCount + 1);
 
             case MIN:
-                int min = this.aggregatedTable.getOrDefault(tuplefield, 0);
-                if (tupleValue < min)
-                    this.aggregatedTable.put(tuplefield, tupleValue);
+                int min = this.aggregatedTable.getOrDefault(tuplefield, Integer.MIN_VALUE);
+                this.aggregatedTable.put(tuplefield, Math.min(min, tupleValue));
 
             case MAX:
-                int max = this.aggregatedTable.getOrDefault(tuplefield, 0);
-                if (tupleValue > max)
-                    this.aggregatedTable.put(tuplefield, tupleValue);
+                int max = this.aggregatedTable.getOrDefault(tuplefield, Integer.MIN_VALUE);
+                this.aggregatedTable.put(tuplefield, Math.max(max, tupleValue));
+
+            case SC_AVG:
+                // lab 7
+                break;
+
+            case SUM_COUNT:
+                // lab7
+                break;
 
             default:
                 return;
@@ -104,7 +113,6 @@ public class IntegerAggregator implements Aggregator {
      *         the constructor.
      */
     public OpIterator iterator() {
-        // some code goes here
         TupleDesc aggTupleDesc;
         ArrayList<Tuple> tuples = new ArrayList<>();
 
@@ -116,12 +124,17 @@ public class IntegerAggregator implements Aggregator {
 
         for (Map.Entry<Field, Integer> groupAggregateEntry : this.aggregatedTable.entrySet()) {
             Tuple tuple = new Tuple(aggTupleDesc);
+            int aggValue = groupAggregateEntry.getValue();
+
+            if (this.operator == Op.AVG) {
+                aggValue = (aggValue) / (this.fieldCountHm.get(groupAggregateEntry.getKey()));
+            }
 
             if ((this.gbfield != Aggregator.NO_GROUPING)) {
                 tuple.setField(0, groupAggregateEntry.getKey());
-                tuple.setField(1, new IntField(groupAggregateEntry.getValue()));
+                tuple.setField(1, new IntField(aggValue));
             } else {
-                tuple.setField(0, new IntField(groupAggregateEntry.getValue()));
+                tuple.setField(0, new IntField(aggValue));
             }
             tuples.add(tuple);
         }

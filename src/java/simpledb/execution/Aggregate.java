@@ -87,7 +87,7 @@ public class Aggregate extends Operator {
      *         tuples
      */
     public String aggregateFieldName() {
-        return this.child.getTupleDesc().getFieldName(afield);
+        return this.child.getTupleDesc().getFieldName(this.afield);
     }
 
     /**
@@ -169,6 +169,8 @@ public class Aggregate extends Operator {
 
     public void close() {
         this.child.close();
+        this.aggIterator = null;
+        this.aggregator = null;
     }
 
     @Override
