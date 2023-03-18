@@ -1,6 +1,11 @@
 package simpledb.execution;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+
 import simpledb.common.Type;
+import simpledb.storage.Field;
+import simpledb.storage.IntField;
 import simpledb.storage.Tuple;
 
 /**
@@ -9,24 +14,39 @@ import simpledb.storage.Tuple;
 public class IntegerAggregator implements Aggregator {
 
     private static final long serialVersionUID = 1L;
+    private int gbfield;
+    private Type gbfieldType;
+    private int afield;
+    private Op operator;
+    private HashMap<Field, Integer> aggregatedTable = new HashMap<>();
+    private HashMap<Field, Integer> fieldCountHm = new HashMap<>();
+    private static Field PLACEHOLDER_FIELD = new IntField(NO_GROUPING);
 
     /**
      * Aggregate constructor
      * 
      * @param gbfield
-     *            the 0-based index of the group-by field in the tuple, or
-     *            NO_GROUPING if there is no grouping
+     *                    the 0-based index of the group-by field in the tuple, or
+     *                    NO_GROUPING if there is no grouping
      * @param gbfieldtype
-     *            the type of the group by field (e.g., Type.INT_TYPE), or null
-     *            if there is no grouping
+     *                    the type of the group by field (e.g., Type.INT_TYPE), or
+     *                    null
+     *                    if there is no grouping
      * @param afield
-     *            the 0-based index of the aggregate field in the tuple
+     *                    the 0-based index of the aggregate field in the tuple
      * @param what
-     *            the aggregation operator
+     *                    the aggregation operator
      */
 
-    public IntegerAggregator(int gbfield, Type gbfieldtype, int afield, Op what) {
-        // some code goes here
+    public IntegerAggregator(
+            int gbfield, Type gbfieldtype,
+            int afield, Op what) {
+
+        this.gbfield = gbfield;
+        this.gbfieldType = gbfieldtype;
+        this.afield = afield;
+        this.operator = what;
+
     }
 
     /**
@@ -37,7 +57,39 @@ public class IntegerAggregator implements Aggregator {
      *            the Tuple containing an aggregate field and a group-by field
      */
     public void mergeTupleIntoGroup(Tuple tup) {
-        // some code goes here
+        boolean noGrouping = this.gbfield == NO_GROUPING;
+        Field tuplefield = PLACEHOLDER_FIELD;
+        int tupleValue = ((IntField) tup.getField(this.afield)).getValue();
+        if (!noGrouping) {
+            tuplefield = tup.getField(this.gbfield);
+        }
+        switch (this.operator) {
+            case COUNT:
+                int count = this.aggregatedTable.getOrDefault(tuplefield, 0);
+                this.aggregatedTable.put(tuplefield, count + 1);
+            case SUM:
+                int sum = this.aggregatedTable.getOrDefault(tuplefield, 0);
+                this.aggregatedTable.put(tuplefield, sum + tupleValue);
+
+            case AVG:
+                int average = this.aggregatedTable.getOrDefault(tuplefield, 0);
+                int fieldCount = this.fieldCountHm.getOrDefault(tuplefield, 0);
+                int newAverage = average + tupleValue / fieldCount + 1;
+                this.aggregatedTable.put(tuplefield, newAverage);
+
+            case MIN:
+                int min = this.aggregatedTable.getOrDefault(tuplefield, 0);
+                if (tupleValue < min)
+                    this.aggregatedTable.put(tuplefield, tupleValue);
+
+            case MAX:
+                int max = this.aggregatedTable.getOrDefault(tuplefield, 0);
+                if (tupleValue > max)
+                    this.aggregatedTable.put(tuplefield, tupleValue);
+
+            default:
+                return;
+        }
     }
 
     /**
@@ -50,8 +102,8 @@ public class IntegerAggregator implements Aggregator {
      */
     public OpIterator iterator() {
         // some code goes here
-        throw new
-        UnsupportedOperationException("please implement me for lab2");
+
+        throw new UnsupportedOperationException("please implement me for lab2");
     }
 
 }
