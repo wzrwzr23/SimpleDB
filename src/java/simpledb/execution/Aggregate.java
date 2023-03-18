@@ -1,6 +1,7 @@
 package simpledb.execution;
 
 import simpledb.common.DbException;
+import simpledb.common.Type;
 import simpledb.storage.Tuple;
 import simpledb.storage.TupleDesc;
 import simpledb.transaction.TransactionAbortedException;
@@ -18,8 +19,11 @@ public class Aggregate extends Operator {
     private OpIterator child;
     private int afield;
     private int gfield;
+    private Type gbfieldType;
+    private Type afieldType;
     private Aggregator.Op aop;
     private Aggregator aggregator;
+    private OpIterator aggIterator;
 
     /**
      * Constructor.
@@ -39,6 +43,11 @@ public class Aggregate extends Operator {
         this.afield = afield;
         this.gfield = gfield;
         this.aop = aop;
+        this.afieldType = child.getTupleDesc().getFieldType(afield);
+        if (gfield != Aggregator.NO_GROUPING) {
+            gbfieldType = child.getTupleDesc().getFieldType(gfield);
+        }
+
     }
 
     /**
@@ -89,9 +98,25 @@ public class Aggregate extends Operator {
         return aop.toString();
     }
 
+    // open the correct aggregator according to type
     public void open() throws NoSuchElementException, DbException,
             TransactionAbortedException {
         this.child.open();
+        if (child.getTupleDesc().getFieldType(afield) == Type.INT_TYPE) {
+            this.aggregator = new IntegerAggregator(this.gfield, this.gbfieldType, this.afield, this.aop);
+        }
+        if (child.getTupleDesc().getFieldType(afield) == Type.STRING_TYPE) {
+            this.aggregator = new StringAggregator(this.gfield, this.gbfieldType, this.afield, this.aop);
+        }
+
+        while (this.child.hasNext()) {
+            Tuple next = child.next();
+            this.aggregator.mergeTupleIntoGroup(next);
+        }
+
+        this.aggIterator = this.aggregator.iterator();
+        this.aggIterator.open();
+
     }
 
     /**
@@ -102,12 +127,16 @@ public class Aggregate extends Operator {
      * aggregate. Should return null if there are no more tuples.
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+        if (this.child.hasNext()) {
+            return child.next();
+        } else {
+            return null;
+        }
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
-        this.child.rewind();
+        this.child.close();
+        this.child.open();
     }
 
     /**
