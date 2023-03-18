@@ -19,11 +19,13 @@ public class Aggregate extends Operator {
     private OpIterator child;
     private int afield;
     private int gfield;
-    private Type gbfieldType;
+    private Type gfieldType;
     private Type afieldType;
+    private String afieldName;
     private Aggregator.Op aop;
     private Aggregator aggregator;
     private OpIterator aggIterator;
+    private TupleDesc tupleDesc;
 
     /**
      * Constructor.
@@ -44,8 +46,9 @@ public class Aggregate extends Operator {
         this.gfield = gfield;
         this.aop = aop;
         this.afieldType = child.getTupleDesc().getFieldType(afield);
+        this.afieldName = child.getTupleDesc().getFieldName(afield);
         if (gfield != Aggregator.NO_GROUPING) {
-            gbfieldType = child.getTupleDesc().getFieldType(gfield);
+            gfieldType = child.getTupleDesc().getFieldType(gfield);
         }
 
     }
@@ -101,12 +104,13 @@ public class Aggregate extends Operator {
     // open the correct aggregator according to type
     public void open() throws NoSuchElementException, DbException,
             TransactionAbortedException {
+        super.open();
         this.child.open();
         if (child.getTupleDesc().getFieldType(afield) == Type.INT_TYPE) {
-            this.aggregator = new IntegerAggregator(this.gfield, this.gbfieldType, this.afield, this.aop);
+            this.aggregator = new IntegerAggregator(this.gfield, this.gfieldType, this.afield, this.aop);
         }
         if (child.getTupleDesc().getFieldType(afield) == Type.STRING_TYPE) {
-            this.aggregator = new StringAggregator(this.gfield, this.gbfieldType, this.afield, this.aop);
+            this.aggregator = new StringAggregator(this.gfield, this.gfieldType, this.afield, this.aop);
         }
 
         while (this.child.hasNext()) {
@@ -151,7 +155,16 @@ public class Aggregate extends Operator {
      * iterator.
      */
     public TupleDesc getTupleDesc() {
-        return this.child.getTupleDesc();
+        if (this.gfield == Aggregator.NO_GROUPING) {
+            this.tupleDesc = new TupleDesc(new Type[] { afieldType }, new String[] { afieldName });
+        } else {
+            String groupbyFieldName = child.getTupleDesc().getFieldName(gfield);
+            tupleDesc = new TupleDesc(
+                    new Type[] { gfieldType, afieldType },
+                    new String[] { groupbyFieldName, afieldName });
+        }
+
+        return this.tupleDesc;
     }
 
     public void close() {
