@@ -9,6 +9,7 @@ import simpledb.transaction.TransactionId;
 
 import java.io.*;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -86,7 +87,8 @@ public class BufferPool {
             Page newPage = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
             this.pagesHashMap.put(pid, newPage);
             if (this.pagesHashMap.size() >= this.numPages) {
-                throw new DbException("Pool exceeds max size.");
+                this.evictPage();
+                // throw new DbException("Pool exceeds max size.");
             }
             return newPage;
         }
@@ -155,6 +157,12 @@ public class BufferPool {
             throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+        DbFile dbFile = Database.getCatalog().getDatabaseFile(tableId);
+        List<Page> pgList = dbFile.insertTuple(tid, t);
+        for(Page pg : pgList){
+            pg.markDirty(true, tid);
+            pagesHashMap.put(pg.getId(), pg);
+        }
     }
 
     /**
@@ -174,6 +182,12 @@ public class BufferPool {
             throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+        DbFile dbFile = Database.getCatalog().getDatabaseFile(t.getRecordId().getPageId().getTableId());
+        List<Page> pgList = dbFile.deleteTuple(tid, t);
+        for(Page pg : pgList){
+            pg.markDirty(true, tid);
+            pagesHashMap.put(pg.getId(),pg);
+        }
     }
 
     /**
@@ -184,7 +198,11 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
-
+        for (Page page: pagesHashMap.values()){
+            if (page.isDirty() != null){ // dirty page
+                flushPage(page.getId());
+            }
+        }
     }
 
     /**
@@ -199,6 +217,7 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // some code goes here
         // not necessary for lab1
+        pagesHashMap.remove(pid);
     }
 
     /**
@@ -209,6 +228,11 @@ public class BufferPool {
     private synchronized void flushPage(PageId pid) throws IOException {
         // some code goes here
         // not necessary for lab1
+        if (pagesHashMap.containsKey(pid)){
+            Page page = pagesHashMap.get(pid);
+            Database.getCatalog().getDatabaseFile(page.getId().getTableId()).writePage(page);
+            page.markDirty(false, null);
+        }
     }
 
     /**
@@ -226,6 +250,17 @@ public class BufferPool {
     private synchronized void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
+        if (pagesHashMap.size() == 0){
+            throw new DbException("No page in the buffer pool");
+        }
+        for (Page page: pagesHashMap.values()){
+            if (page.isDirty() == null){ // the oldest not dirty page
+                discardPage(page.getId());
+                return;
+            }
+        }
+        throw new DbException("All pages in the buffer pool are dirty.");
     }
 
 }
+

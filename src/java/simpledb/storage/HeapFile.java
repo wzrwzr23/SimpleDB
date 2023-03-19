@@ -10,6 +10,9 @@ import simpledb.transaction.TransactionId;
 import java.io.*;
 import java.util.*;
 
+import java.util.concurrent.locks.Lock;  
+import java.util.concurrent.locks.ReentrantLock;
+
 /**
  * HeapFile is an implementation of a DbFile that stores a collection of tuples
  * in no particular order. Tuples are stored on pages, each of which is a fixed
@@ -64,7 +67,6 @@ public class HeapFile implements DbFile {
     public int getId() {
         // some code goes here
         return this.file.getAbsoluteFile().hashCode();
-        // throw new UnsupportedOperationException("implement this");
     }
 
     /**
@@ -75,7 +77,6 @@ public class HeapFile implements DbFile {
     public TupleDesc getTupleDesc() {
         // some code goes here
         return this.td;
-        // throw new UnsupportedOperationException("implement this");
     }
 
     // see DbFile.java for javadocs
@@ -107,19 +108,23 @@ public class HeapFile implements DbFile {
             heapPage = new HeapPage((HeapPageId) pid, buf);
             randomAccessFile.close();
             return heapPage;
-        } catch (FileNotFoundException e ) {
-            e.printStackTrace();
         } catch (IOException e){
-            e.printStackTrace();
+            throw new RuntimeException(e);        
         }
-
-        return heapPage;
     }
 
     // see DbFile.java for javadocs
     public void writePage(Page page) throws IOException {
         // some code goes here
         // not necessary for lab1
+        int pgNo = page.getId().getPageNumber();
+        RandomAccessFile randomAccessFile = new RandomAccessFile(this.file, "rws");
+        randomAccessFile.skipBytes(pgNo * Database.getBufferPool().getPageSize());
+        randomAccessFile.write(page.getPageData());
+        if ( pgNo >= this.numPage){
+            this.numPage = pgNo + 1;
+        }
+        randomAccessFile.close();
     }
 
     /**
@@ -134,22 +139,53 @@ public class HeapFile implements DbFile {
     public List<Page> insertTuple(TransactionId tid, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
         // some code goes here
-        return null;
         // not necessary for lab1
+        if (!t.getTupleDesc().equals(this.td)){
+            throw new DbException("The tupledesc doesn't match.");
+        } 
+            List<Page> pgList = new ArrayList<>();
+            BufferPool bufferPool = Database.getBufferPool();
+            for (int i=0; i<this.numPage; i++){
+                HeapPageId pid = new HeapPageId(getId(), i); 
+                HeapPage pg = (HeapPage) bufferPool.getPage(tid, pid, Permissions.READ_WRITE);
+                if (pg.getNumEmptySlots() == 0){ // page full
+                    continue;
+                }
+                pg.insertTuple(t);
+                pg.markDirty(true, tid);
+                pgList.add(pg);
+                return pgList;    
+            }
+            // add a new page
+            HeapPageId pid = new HeapPageId(getId(), this.numPage); 
+            HeapPage pg = (HeapPage) bufferPool.getPage(tid, pid, Permissions.READ_ONLY);
+            pg.insertTuple(t);
+            pg.markDirty(true, tid);
+            pgList.add(pg);
+            // this.numPage += 1;
+            return pgList;
     }
 
     // see DbFile.java for javadocs
     public ArrayList<Page> deleteTuple(TransactionId tid, Tuple t) throws DbException,
             TransactionAbortedException {
         // some code goes here
-        return null;
         // not necessary for lab1
+        PageId pid = t.getRecordId().getPageId();
+        if (pid.getTableId() != getId()){ // pageid doesn't match
+            throw new DbException("The tupele is not a member of the file.");
+        }    
+        ArrayList<Page> pgList = new ArrayList<>();
+        HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, pid, Permissions.READ_WRITE);
+        page.deleteTuple(t);
+        pgList.add(page);
+        return pgList;
     }
 
     // see DbFile.java for javadocs
     public DbFileIterator iterator(TransactionId tid) {
         // some code goes here
-        return new HeapFileIterator(tid);
+        return new HeapFileIterator(this, tid);
     }
 
     public class HeapFileIterator implements DbFileIterator {
@@ -158,9 +194,11 @@ public class HeapFile implements DbFile {
         Permissions perm = Permissions.READ_ONLY;
         TransactionId tid;
         Iterator<Tuple> it;
+        HeapFile file;
         
-        HeapFileIterator(TransactionId tid){
+        HeapFileIterator(HeapFile f, TransactionId tid){
             this.tid = tid;
+            this.file = f;
         }
 
         @Override
@@ -181,7 +219,7 @@ public class HeapFile implements DbFile {
             if (this.pgNo+1 >= numPages()){ // no more page
                 return false;
             }
-            while (true){ // find next page with tuples
+            while (!it.hasNext() && this.pgNo < this.file.numPages() - 1){ // find next page with tuples
                 this.pgNo++;
                 HeapPageId heapPageId = new HeapPageId(getId(), this.pgNo);
                 HeapPage page = (HeapPage) this.bufferPool.getPage(tid,heapPageId,this.perm);
@@ -193,17 +231,15 @@ public class HeapFile implements DbFile {
                     return true;
                 }    
             }
-
+            return false;
         }
 
         @Override
         public Tuple next() throws DbException, TransactionAbortedException, NoSuchElementException {
             if (it == null || !it.hasNext()){
                 throw new NoSuchElementException();
-            }
-            
+            }           
             return it.next();
-            
         }
 
         @Override
@@ -220,4 +256,3 @@ public class HeapFile implements DbFile {
     }
 
 }
-
