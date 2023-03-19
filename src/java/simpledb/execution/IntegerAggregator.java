@@ -61,11 +61,10 @@ public class IntegerAggregator implements Aggregator {
      *            the Tuple containing an aggregate field and a group-by field
      */
     public void mergeTupleIntoGroup(Tuple tup) {
-        boolean noGrouping = this.gbfield == NO_GROUPING;
         Field tuplefield = PLACEHOLDER_FIELD;
         int tupleValue = ((IntField) tup.getField(this.afield)).getValue();
 
-        if (!noGrouping) {
+        if (hasGroupings) {
             tuplefield = tup.getField(this.gbfield);
         }
 
@@ -126,16 +125,16 @@ public class IntegerAggregator implements Aggregator {
         ArrayList<Tuple> tuples = new ArrayList<>();
         for (Map.Entry<Field, Integer> entry : aggregatedTable.entrySet()) {
             Tuple tup = new Tuple(td);
-            int aggregatedValue = entry.getValue();
+            int aggVal = entry.getValue();
             if (this.operator == Op.AVG) {
                 int count = this.fieldCountHm.get(entry.getKey());
-                aggregatedValue = aggregatedValue / count;
+                aggVal = aggVal / count;
             }
             if (hasGroupings) {
                 tup.setField(0, entry.getKey());
-                tup.setField(1, new IntField(aggregatedValue));
+                tup.setField(1, new IntField(aggVal));
             } else {
-                tup.setField(0, new IntField(aggregatedValue));
+                tup.setField(0, new IntField(aggVal));
             }
             tuples.add(tup);
         }
