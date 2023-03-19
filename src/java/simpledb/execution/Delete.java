@@ -57,11 +57,13 @@ public class Delete extends Operator {
         // some code goes here
         super.close();
         this.child.close();
+        fetched = false;
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
         // some code goes here
         this.child.rewind();
+        fetched = false;
     }
 
     /**
