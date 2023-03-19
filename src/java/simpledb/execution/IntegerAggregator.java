@@ -24,6 +24,7 @@ public class IntegerAggregator implements Aggregator {
     private HashMap<Field, Integer> aggregatedTable = new HashMap<>();
     private HashMap<Field, Integer> fieldCountHm = new HashMap<>();
     private static Field PLACEHOLDER_FIELD = new IntField(NO_GROUPING);
+    private boolean hasGroupings;
 
     /**
      * Aggregate constructor
@@ -49,7 +50,7 @@ public class IntegerAggregator implements Aggregator {
         this.gbfieldType = gbfieldtype;
         this.afield = afield;
         this.operator = what;
-
+        this.hasGroupings = gbfield != NO_GROUPING;
     }
 
     /**
@@ -72,24 +73,29 @@ public class IntegerAggregator implements Aggregator {
             case COUNT:
                 int count = this.aggregatedTable.getOrDefault(tuplefield, 0);
                 this.aggregatedTable.put(tuplefield, count + 1);
+                break;
 
             case SUM:
                 int sum = this.aggregatedTable.getOrDefault(tuplefield, 0);
                 this.aggregatedTable.put(tuplefield, sum + tupleValue);
+                break;
 
             case AVG:
                 int total = this.aggregatedTable.getOrDefault(tuplefield, 0);
                 int fieldCount = this.fieldCountHm.getOrDefault(tuplefield, 0);
                 this.aggregatedTable.put(tuplefield, total + tupleValue);
                 this.fieldCountHm.put(tuplefield, fieldCount + 1);
+                break;
 
             case MIN:
                 int min = this.aggregatedTable.getOrDefault(tuplefield, Integer.MIN_VALUE);
                 this.aggregatedTable.put(tuplefield, Math.min(min, tupleValue));
+                break;
 
             case MAX:
                 int max = this.aggregatedTable.getOrDefault(tuplefield, Integer.MIN_VALUE);
                 this.aggregatedTable.put(tuplefield, Math.max(max, tupleValue));
+                break;
 
             case SC_AVG:
                 // lab 7
@@ -98,9 +104,6 @@ public class IntegerAggregator implements Aggregator {
             case SUM_COUNT:
                 // lab7
                 break;
-
-            default:
-                return;
         }
     }
 
@@ -113,32 +116,31 @@ public class IntegerAggregator implements Aggregator {
      *         the constructor.
      */
     public OpIterator iterator() {
-        TupleDesc aggTupleDesc;
-        ArrayList<Tuple> tuples = new ArrayList<>();
-
-        if ((this.gbfield != Aggregator.NO_GROUPING)) {
-            aggTupleDesc = new TupleDesc(new Type[] { this.gbfieldType, Type.INT_TYPE });
+        TupleDesc td;
+        if (hasGroupings) {
+            td = new TupleDesc(new Type[] { this.gbfieldType, Type.INT_TYPE });
         } else {
-            aggTupleDesc = new TupleDesc(new Type[] { Type.INT_TYPE });
+            td = new TupleDesc(new Type[] { Type.INT_TYPE });
         }
 
-        for (Map.Entry<Field, Integer> groupAggregateEntry : this.aggregatedTable.entrySet()) {
-            Tuple tuple = new Tuple(aggTupleDesc);
-            int aggValue = groupAggregateEntry.getValue();
-
+        ArrayList<Tuple> tuples = new ArrayList<>();
+        for (Map.Entry<Field, Integer> entry : aggregatedTable.entrySet()) {
+            Tuple tup = new Tuple(td);
+            int aggregatedValue = entry.getValue();
             if (this.operator == Op.AVG) {
-                aggValue = (aggValue) / (this.fieldCountHm.get(groupAggregateEntry.getKey()));
+                int count = this.fieldCountHm.get(entry.getKey());
+                aggregatedValue = aggregatedValue / count;
             }
-
-            if ((this.gbfield != Aggregator.NO_GROUPING)) {
-                tuple.setField(0, groupAggregateEntry.getKey());
-                tuple.setField(1, new IntField(aggValue));
+            if (hasGroupings) {
+                tup.setField(0, entry.getKey());
+                tup.setField(1, new IntField(aggregatedValue));
             } else {
-                tuple.setField(0, new IntField(aggValue));
+                tup.setField(0, new IntField(aggregatedValue));
             }
-            tuples.add(tuple);
+            tuples.add(tup);
         }
-        return new TupleIterator(aggTupleDesc, tuples);
-    }
 
+        return new TupleIterator(td, tuples);
+
+    }
 }
