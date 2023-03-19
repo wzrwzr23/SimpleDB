@@ -119,9 +119,9 @@ public class HeapFile implements DbFile {
         // not necessary for lab1
         int pgNo = page.getId().getPageNumber();
         RandomAccessFile randomAccessFile = new RandomAccessFile(this.file, "rws");
-        randomAccessFile.skipBytes(pgNo * BufferPool.getPageSize());
+        randomAccessFile.skipBytes(pgNo * Database.getBufferPool().getPageSize());
         randomAccessFile.write(page.getPageData());
-        if ( pgNo > this.numPage){
+        if ( pgNo >= this.numPage){
             this.numPage = pgNo + 1;
         }
         randomAccessFile.close();
@@ -185,7 +185,7 @@ public class HeapFile implements DbFile {
     // see DbFile.java for javadocs
     public DbFileIterator iterator(TransactionId tid) {
         // some code goes here
-        return new HeapFileIterator(tid);
+        return new HeapFileIterator(this, tid);
     }
 
     public class HeapFileIterator implements DbFileIterator {
@@ -194,9 +194,11 @@ public class HeapFile implements DbFile {
         Permissions perm = Permissions.READ_ONLY;
         TransactionId tid;
         Iterator<Tuple> it;
+        HeapFile file;
         
-        HeapFileIterator(TransactionId tid){
+        HeapFileIterator(HeapFile f, TransactionId tid){
             this.tid = tid;
+            this.file = f;
         }
 
         @Override
@@ -217,7 +219,7 @@ public class HeapFile implements DbFile {
             if (this.pgNo+1 >= numPages()){ // no more page
                 return false;
             }
-            while (true){ // find next page with tuples
+            while (!it.hasNext() && this.pgNo < this.file.numPages() - 1){ // find next page with tuples
                 this.pgNo++;
                 HeapPageId heapPageId = new HeapPageId(getId(), this.pgNo);
                 HeapPage page = (HeapPage) this.bufferPool.getPage(tid,heapPageId,this.perm);
@@ -229,17 +231,15 @@ public class HeapFile implements DbFile {
                     return true;
                 }    
             }
-
+            return false;
         }
 
         @Override
         public Tuple next() throws DbException, TransactionAbortedException, NoSuchElementException {
             if (it == null || !it.hasNext()){
                 throw new NoSuchElementException();
-            }
-            
+            }           
             return it.next();
-            
         }
 
         @Override
