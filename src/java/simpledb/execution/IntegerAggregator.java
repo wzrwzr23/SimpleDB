@@ -61,47 +61,40 @@ public class IntegerAggregator implements Aggregator {
      *            the Tuple containing an aggregate field and a group-by field
      */
     public void mergeTupleIntoGroup(Tuple tup) {
-        Field tuplefield = PLACEHOLDER_FIELD;
-        int tupleValue = ((IntField) tup.getField(this.afield)).getValue();
-
+        Field groupField = PLACEHOLDER_FIELD;
         if (hasGroupings) {
-            tuplefield = tup.getField(this.gbfield);
+            groupField = tup.getField(this.gbfield);
         }
-
+        int tupleVal = ((IntField) tup.getField(afield)).getValue();
         switch (this.operator) {
-            case COUNT:
-                int count = this.aggregatedTable.getOrDefault(tuplefield, 0);
-                this.aggregatedTable.put(tuplefield, count + 1);
+            case AVG: {
+                int total = this.aggregatedTable.getOrDefault(groupField, 0);
+                int prevCount = this.fieldCountHm.getOrDefault(groupField, 0);
+                aggregatedTable.put(groupField, total + tupleVal);
+                fieldCountHm.put(groupField, prevCount + 1);
                 break;
-
-            case SUM:
-                int sum = this.aggregatedTable.getOrDefault(tuplefield, 0);
-                this.aggregatedTable.put(tuplefield, sum + tupleValue);
+            }
+            case MAX: {
+                int prevValue = this.aggregatedTable.getOrDefault(groupField, Integer.MIN_VALUE);
+                aggregatedTable.put(groupField, Math.max(prevValue, tupleVal));
                 break;
-
-            case AVG:
-                int total = this.aggregatedTable.getOrDefault(tuplefield, 0);
-                int fieldCount = this.fieldCountHm.getOrDefault(tuplefield, 0);
-                this.aggregatedTable.put(tuplefield, total + tupleValue);
-                this.fieldCountHm.put(tuplefield, fieldCount + 1);
+            }
+            case MIN: {
+                int prevValue = this.aggregatedTable.getOrDefault(groupField, Integer.MAX_VALUE);
+                aggregatedTable.put(groupField, Math.min(prevValue, tupleVal));
                 break;
-
-            case MIN:
-                int min = this.aggregatedTable.getOrDefault(tuplefield, Integer.MIN_VALUE);
-                this.aggregatedTable.put(tuplefield, Math.min(min, tupleValue));
+            }
+            case SUM: {
+                int prevValue = this.aggregatedTable.getOrDefault(groupField, 0);
+                aggregatedTable.put(groupField, prevValue + tupleVal);
                 break;
-
-            case MAX:
-                int max = this.aggregatedTable.getOrDefault(tuplefield, Integer.MIN_VALUE);
-                this.aggregatedTable.put(tuplefield, Math.max(max, tupleValue));
+            }
+            case COUNT: {
+                int prevValue = this.aggregatedTable.getOrDefault(groupField, 0);
+                aggregatedTable.put(groupField, prevValue + 1);
                 break;
-
-            case SC_AVG:
-                // lab 7
-                break;
-
-            case SUM_COUNT:
-                // lab7
+            }
+            default:
                 break;
         }
     }
