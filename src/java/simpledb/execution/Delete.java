@@ -33,7 +33,7 @@ public class Delete extends Operator {
     private OpIterator child;
     private TupleDesc td = new TupleDesc(new Type[] {Type.INT_TYPE});
     private boolean fetched = false;
-    private BufferPool bufferPool;
+    private BufferPool bufferPool = Database.getBufferPool();
 
     public Delete(TransactionId t, OpIterator child) {
         // some code goes here
@@ -57,13 +57,11 @@ public class Delete extends Operator {
         // some code goes here
         super.close();
         this.child.close();
-        fetched = false;
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
         // some code goes here
         this.child.rewind();
-        fetched = false;
     }
 
     /**
@@ -75,14 +73,16 @@ public class Delete extends Operator {
      * @see Database#getBufferPool
      * @see BufferPool#deleteTuple
      */
+
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
         if (fetched){
             return null;
         }else{
             fetched = true;
-            Tuple toDelTuple = null;
             int count = 0;
+            Tuple toDelTuple = null;
+
             if (toDelTuple == null){
                 toDelTuple = this.child.hasNext() ? this.child.next() : null;
             }
