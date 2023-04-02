@@ -113,10 +113,10 @@ public class BufferPool {
      * Release all locks associated with a given transaction.
      *
      * @param tid the ID of the transaction requesting the unlock
+     * @throws IOException
      */
-    public void transactionComplete(TransactionId tid) {
-        // some code goes here
-        // not necessary for lab1|lab2
+    public void transactionComplete(TransactionId tid) throws IOException {
+        transactionComplete(tid, true);
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
@@ -132,10 +132,36 @@ public class BufferPool {
      *
      * @param tid    the ID of the transaction requesting the unlock
      * @param commit a flag indicating whether we should commit or abort
+     * @throws IOException
      */
-    public void transactionComplete(TransactionId tid, boolean commit) {
-        // some code goes here
-        // not necessary for lab1|lab2
+    public void transactionComplete(TransactionId tid, boolean commit) throws IOException {
+        if (commit) {
+            // if commit, write all dirty pages to disk
+            this.flushPages(tid);
+
+        } else {
+            // if not commit, revert any changes
+            this.revertTransaction(tid);
+        }
+        // release all locks
+
+    }
+
+    /**
+     * Reverts all dirtied pages to the version on the disk
+     * 
+     * @param tid the ID of the transaction that does not want to commit
+     * 
+     */
+    public void revertTransaction(TransactionId tid) {
+        // make sure page is dirty before reverting
+        for (Page page : this.pagesHashMap.values()) {
+            PageId pid = page.getId();
+            if (page.isDirty() == tid && page.isDirty() != null) {
+                Page oldPage = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
+                this.pagesHashMap.put(pid, oldPage);
+            }
+        }
     }
 
     /**
@@ -159,7 +185,7 @@ public class BufferPool {
         // not necessary for lab1
         DbFile dbFile = Database.getCatalog().getDatabaseFile(tableId);
         List<Page> pgList = dbFile.insertTuple(tid, t);
-        for(Page pg : pgList){
+        for (Page pg : pgList) {
             pg.markDirty(true, tid);
             pagesHashMap.put(pg.getId(), pg);
         }
@@ -184,9 +210,9 @@ public class BufferPool {
         // not necessary for lab1
         DbFile dbFile = Database.getCatalog().getDatabaseFile(t.getRecordId().getPageId().getTableId());
         List<Page> pgList = dbFile.deleteTuple(tid, t);
-        for(Page pg : pgList){
+        for (Page pg : pgList) {
             pg.markDirty(true, tid);
-            pagesHashMap.put(pg.getId(),pg);
+            pagesHashMap.put(pg.getId(), pg);
         }
     }
 
@@ -198,8 +224,8 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
-        for (Page page: pagesHashMap.values()){
-            if (page.isDirty() != null){ // dirty page
+        for (Page page : pagesHashMap.values()) {
+            if (page.isDirty() != null) { // dirty page
                 flushPage(page.getId());
             }
         }
@@ -228,7 +254,7 @@ public class BufferPool {
     private synchronized void flushPage(PageId pid) throws IOException {
         // some code goes here
         // not necessary for lab1
-        if (pagesHashMap.containsKey(pid)){
+        if (pagesHashMap.containsKey(pid)) {
             Page page = pagesHashMap.get(pid);
             Database.getCatalog().getDatabaseFile(page.getId().getTableId()).writePage(page);
             page.markDirty(false, null);
@@ -239,8 +265,13 @@ public class BufferPool {
      * Write all pages of the specified transaction to disk.
      */
     public synchronized void flushPages(TransactionId tid) throws IOException {
-        // some code goes here
-        // not necessary for lab1|lab2
+        // iterate through all pages and flush(write to disk) them if dirtied by the
+        // given transaction
+        for (Page page : pagesHashMap.values()) {
+            if (page.isDirty() == tid && page.isDirty() != null) {
+                this.flushPage(page.getId());
+            }
+        }
     }
 
     /**
@@ -250,11 +281,11 @@ public class BufferPool {
     private synchronized void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
-        if (pagesHashMap.size() == 0){
+        if (pagesHashMap.size() == 0) {
             throw new DbException("No page in the buffer pool");
         }
-        for (Page page: pagesHashMap.values()){
-            if (page.isDirty() == null){ // the oldest not dirty page
+        for (Page page : pagesHashMap.values()) {
+            if (page.isDirty() == null) { // the oldest not dirty page
                 discardPage(page.getId());
                 return;
             }
@@ -263,4 +294,3 @@ public class BufferPool {
     }
 
 }
-
