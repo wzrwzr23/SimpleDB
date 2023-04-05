@@ -8,8 +8,9 @@ import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
 import java.io.*;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -31,6 +32,7 @@ public class BufferPool {
 
     private int numPages;
     private ConcurrentHashMap<PageId, Page> pagesHashMap;
+    private LockManager lockManager;
 
     /**
      * Default number of pages passed to the constructor. This is used by
@@ -47,6 +49,7 @@ public class BufferPool {
     public BufferPool(int numPages) {
         this.numPages = numPages;
         this.pagesHashMap = new ConcurrentHashMap<>();
+        this.lockManager = new LockManager();
     }
 
     public static int getPageSize() {
@@ -81,15 +84,28 @@ public class BufferPool {
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
             throws TransactionAbortedException, DbException {
 
+        this.lockManager.acquireLock(tid, pid, perm);
+        // boolean lockAcquired = false;
+        // long start = System.currentTimeMillis();
+        // long timeout = new Random().nextInt(2000);
+        // while(!lockAcquired){
+        //     long now = System.currentTimeMillis();
+        //     if(now - start> timeout){
+        //         throw new TransactionAbortedException();
+        //     }
+        //     lockAcquired = lockManager.acquireLock(tid, pid, perm);
+        // }
+        
         if (pagesHashMap.containsKey(pid)) {
             return pagesHashMap.get(pid);
         } else {
             Page newPage = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
-            this.pagesHashMap.put(pid, newPage);
+            
             if (this.pagesHashMap.size() >= this.numPages) {
                 this.evictPage();
                 // throw new DbException("Pool exceeds max size.");
             }
+            pagesHashMap.put(pid, newPage);
             return newPage;
         }
 
@@ -107,6 +123,7 @@ public class BufferPool {
     public void unsafeReleasePage(TransactionId tid, PageId pid) {
         // some code goes here
         // not necessary for lab1|lab2
+        lockManager.releaseLock(tid,pid);
     }
 
     /**
@@ -117,13 +134,14 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) {
         // some code goes here
         // not necessary for lab1|lab2
+        transactionComplete(tid,true);
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
     public boolean holdsLock(TransactionId tid, PageId p) {
         // some code goes here
         // not necessary for lab1|lab2
-        return false;
+        return lockManager.holdsLock(tid,p);
     }
 
     /**
@@ -136,6 +154,33 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid, boolean commit) {
         // some code goes here
         // not necessary for lab1|lab2
+        if(commit){
+            try {
+                flushPages(tid);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }else{
+            revertTransaction(tid);
+        }    
+        lockManager.releaseAllLocks(tid);
+    }
+    
+    /**
+     * Reverts all dirtied pages to the version on the disk
+     * 
+     * @param tid the ID of the transaction that does not want to commit
+     * 
+     */
+    public void revertTransaction(TransactionId tid) {
+        // make sure page is dirty before reverting
+        for (Page page : this.pagesHashMap.values()) {
+            PageId pid = page.getId();
+            if (page.isDirty() == tid && page.isDirty() != null) {
+                Page oldPage = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
+                this.pagesHashMap.put(pid, oldPage);
+            }
+        }
     }
 
     /**
@@ -241,6 +286,18 @@ public class BufferPool {
     public synchronized void flushPages(TransactionId tid) throws IOException {
         // some code goes here
         // not necessary for lab1|lab2
+        for (PageId pid : pagesHashMap.keySet()) {
+            Page page = pagesHashMap.getOrDefault(pid, null);
+            if (page != null && page.isDirty() != null && page.isDirty().equals(tid)) {
+                DbFile dbFile = Database.getCatalog().getDatabaseFile(page.getId().getTableId());
+                try{
+                    page.markDirty(false,null);
+                    dbFile.writePage(page);
+                }catch (IOException e){
+                    e.printStackTrace();
+                }
+            }
+        }            
     }
 
     /**
@@ -254,7 +311,7 @@ public class BufferPool {
             throw new DbException("No page in the buffer pool");
         }
         for (Page page: pagesHashMap.values()){
-            if (page.isDirty() == null){ // the oldest not dirty page
+            if (page.isDirty() == null){ // random not dirty page
                 discardPage(page.getId());
                 return;
             }
