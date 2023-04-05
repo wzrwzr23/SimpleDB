@@ -82,8 +82,8 @@ public class HeapFile implements DbFile {
     // see DbFile.java for javadocs
     public Page readPage(PageId pid) throws IllegalArgumentException{
         // some code goes here
-        HeapPage heapPage = null;
-        int pageSize = BufferPool.getPageSize();
+        
+        int pageSize = Database.getBufferPool().getPageSize();
         int pgNo = pid.getPageNumber();
         byte[] buf = new byte[pageSize];
 
@@ -93,16 +93,17 @@ public class HeapFile implements DbFile {
         }
 
         try {
+            HeapPage heapPage = new HeapPage((HeapPageId)pid, HeapPage.createEmptyPageData());
             if (pgNo == numPages()){ // pid reaches the end of this file. Create an empty page
                 numPage += 1;
-                return new HeapPage((HeapPageId)pid, HeapPage.createEmptyPageData());
+                return heapPage;
             }
             // read file
             RandomAccessFile randomAccessFile = new RandomAccessFile(this.file, "r");
             randomAccessFile.seek(pgNo * pageSize);
             if(randomAccessFile.read(buf)==-1){
                 randomAccessFile.close();
-                return null;
+                return heapPage;
             }
 
             heapPage = new HeapPage((HeapPageId) pid, buf);
