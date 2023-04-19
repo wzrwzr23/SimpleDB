@@ -262,8 +262,33 @@ public class BTreeFile implements DbFile {
 		// the new entry.  getParentWithEmtpySlots() will be useful here.  Don't forget to update
 		// the sibling pointers of all the affected leaf pages.  Return the page into which a 
 		// tuple with the given key field should be inserted.
-        return null;
+		BTreeLeafPage newLeafPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+		Iterator<Tuple> it = page.reverseIterator();
+		int count = page.getNumTuples()/2;
+		// move and delete half tuples
+		for (int i=0; i<count; i++){
+			Tuple cur = it.next();
+			page.deleteTuple(cur);
+			newLeafPage.insertTuple(cur);
+		}
+
+		newLeafPage.setRightSiblingId(page.getRightSiblingId());
+		newLeafPage.setLeftSiblingId(page.getId());
+		page.setRightSiblingId(newLeafPage.getId());
+
+		Field f = it.next().getField(keyField);
+		BTreeEntry newParentEntry = new BTreeEntry(f, page.getId(), newLeafPage.getId());
+		BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), f);
+		parent.insertEntry(newParentEntry);
 		
+		updateParentPointer(tid, dirtypages, parent.getId(), page.getId());
+		updateParentPointer(tid, dirtypages, parent.getId(), newLeafPage.getId());
+		
+		dirtypages.put(parent.getId(), parent);
+		dirtypages.put(page.getId(), page);
+		dirtypages.put(newLeafPage.getId(), newLeafPage);
+
+		return field.compare(Predicate.Op.GREATER_THAN, f) ? newLeafPage : page;		
 	}
 	
 	/**
@@ -300,7 +325,34 @@ public class BTreeFile implements DbFile {
 		// the parent pointers of all the children moving to the new page.  updateParentPointers()
 		// will be useful here.  Return the page into which an entry with the given key field
 		// should be inserted.
-		return null;
+		BTreeInternalPage newInternalPage = (BTreeInternalPage) getEmptyPage(tid, dirtypages, BTreePageId.INTERNAL);
+		Iterator<BTreeEntry> it = page.reverseIterator();
+		int count = page.getNumEntries()/2;
+		// move and delete half entries
+		for (int i=0; i<count; i++){
+			BTreeEntry cur = it.next();
+			page.deleteKeyAndRightChild(cur);
+			newInternalPage.insertEntry(cur);
+			updateParentPointer(tid, dirtypages, newInternalPage.getId(), cur.getRightChild());
+		}
+
+		BTreeEntry pushup = it.next();
+		page.deleteKeyAndRightChild(pushup);
+		updateParentPointer(tid, dirtypages, newInternalPage.getId(), pushup.getRightChild());
+		pushup.setLeftChild(page.getId());
+		pushup.setRightChild(newInternalPage.getId());
+
+		BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), pushup.getKey());
+		parent.insertEntry(pushup);
+
+		updateParentPointer(tid, dirtypages, parent.getId(), page.getId());
+		updateParentPointer(tid, dirtypages, parent.getId(), newInternalPage.getId());
+
+		dirtypages.put(parent.getId(), parent);
+		dirtypages.put(page.getId(), page);
+		dirtypages.put(newInternalPage.getId(), newInternalPage);
+		
+		return field.compare(Predicate.Op.GREATER_THAN, pushup.getKey()) ? newInternalPage : page;
 	}
 	
 	/**
