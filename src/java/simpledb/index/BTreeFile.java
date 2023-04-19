@@ -12,6 +12,7 @@ import simpledb.common.Debug;
 import simpledb.storage.*;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
+import simpledb.execution.Predicate;
 
 /**
  * BTreeFile is an implementation of a DbFile that stores a B+ tree.
@@ -188,7 +189,29 @@ public class BTreeFile implements DbFile {
                                        Field f)
 					throws DbException, TransactionAbortedException {
 		// some code goes here
-        return null;
+		if (pid.pgcateg() == BTreePageId.LEAF){
+			return (BTreeLeafPage) this.getPage(tid, dirtypages, pid, perm);
+		}
+
+		BTreeInternalPage pg = (BTreeInternalPage) this.getPage(tid, dirtypages, pid, Permissions.READ_ONLY);
+		Iterator<BTreeEntry> it = pg.iterator();
+		int numSlots = 0;
+		BTreeEntry cur;
+		while(it.hasNext()){
+			cur = it.next();
+			numSlots++;
+			if (f == null){
+				return findLeafPage(tid, dirtypages, cur.getLeftChild(), perm, f);
+			}
+			if (f.compare(Predicate.Op.GREATER_THAN, cur.getKey())){ 
+				if (numSlots == pg.getNumEntries()){ // last entry
+					return findLeafPage(tid, dirtypages, cur.getRightChild(), perm, f); // go right child
+				}                      
+				continue; // got next entry
+			}
+			return findLeafPage(tid, dirtypages, cur.getLeftChild(), perm, f); // go left child              
+		}
+        return null;		
 	}
 	
 	/**
