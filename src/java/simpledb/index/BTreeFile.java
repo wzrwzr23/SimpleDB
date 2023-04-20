@@ -869,24 +869,24 @@ public class BTreeFile implements DbFile {
 		// that the entries are evenly distributed. Be sure to update
 		// the corresponding parent entry. Be sure to update the parent
 		// pointers of all children in the entries that were moved.
-		Iterator<BTreeEntry> bTreeEntryIterator = rightSibling.reverseIterator();
+		Iterator<BTreeEntry> bTreeEntryIterator = rightSibling.iterator();
 		int numEntry = (rightSibling.getNumEntries() - page.getNumEntries()) / 2;
 
-		BTreeEntry move = bTreeEntryIterator.next();
-		BTreeEntry centre = new BTreeEntry(parentEntry.getKey(), move.getRightChild(),
-				page.iterator().next().getLeftChild());
+		BTreeEntry nextTuple = bTreeEntryIterator.next();
+		BTreeEntry centre = new BTreeEntry(parentEntry.getKey(), page.reverseIterator().next().getRightChild(),
+				nextTuple.getLeftChild());
 		page.insertEntry(centre);
 
 		for (int i = 0; i < numEntry - 1; ++i) {
 			if (bTreeEntryIterator.hasNext() == false) {
 				throw new DbException("No tuples when stealing from right internal page.");
 			}
-			rightSibling.deleteKeyAndRightChild(move);
-			page.insertEntry(move);
-			move = bTreeEntryIterator.next();
+			rightSibling.deleteKeyAndLeftChild(nextTuple);
+			page.insertEntry(nextTuple);
+			nextTuple = bTreeEntryIterator.next();
 		}
-		rightSibling.deleteKeyAndRightChild(move);
-		parentEntry.setKey(move.getKey());
+		rightSibling.deleteKeyAndLeftChild(nextTuple);
+		parentEntry.setKey(nextTuple.getKey());
 		parent.updateEntry(parentEntry);
 		updateParentPointers(tid, dirtypages, page);
 	}
