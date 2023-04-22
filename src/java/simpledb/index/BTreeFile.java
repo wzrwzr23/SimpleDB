@@ -278,47 +278,40 @@ public class BTreeFile implements DbFile {
 		// the sibling pointers of all the affected leaf pages. Return the page into
 		// which a
 		// tuple with the given key field should be inserted.
-		BTreeLeafPage rightPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
-		Iterator<Tuple> tuples = page.reverseIterator();
-
-		if (tuples == null || !tuples.hasNext()) {
-			throw new DbException("No more tuples.");
+		BTreeLeafPage rPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+		BTreeLeafPageReverseIterator reverseIterator = (BTreeLeafPageReverseIterator) page.reverseIterator();
+		if (reverseIterator.hasNext() == false || reverseIterator == null) {
+			throw new DbException("No more tuples");
 		}
-
-		int tuplenum = page.getNumTuples();
-		for (int i = 0; i < tuplenum / 2; ++i) {
-			if (!tuples.hasNext()) {
-				throw new DbException("No more tuples.");
+		int numTuples = page.getNumTuples() / 2;
+		for (int i = 0; i < numTuples; ++i) {
+			if (reverseIterator.hasNext()) {
+				Tuple tuple = reverseIterator.next();
+				page.deleteTuple(tuple);
+				rPage.insertTuple(tuple);
+			} else {
+				throw new DbException("No more tuples");
 			}
-			Tuple tuple = tuples.next();
-			page.deleteTuple(tuple);
-			rightPage.insertTuple(tuple);
 		}
-
-		// If there is a right neighbor, update its pointer
 		if (page.getRightSiblingId() != null) {
-			BTreePageId oldRightId = page.getRightSiblingId();
-			BTreeLeafPage oldRightPage = (BTreeLeafPage) getPage(tid, dirtypages, oldRightId, Permissions.READ_WRITE);
-			oldRightPage.setLeftSiblingId(rightPage.getId());
+			BTreePageId lastRightId = page.getRightSiblingId();
+			BTreeLeafPage lastrPage = (BTreeLeafPage) getPage(tid, dirtypages, lastRightId, Permissions.READ_WRITE);
+			lastrPage.setLeftSiblingId(rPage.getId());
 		}
+		rPage.setLeftSiblingId(page.getId());
+		rPage.setRightSiblingId(page.getRightSiblingId());
+		page.setRightSiblingId(rPage.getId());
 
-		rightPage.setLeftSiblingId(page.getId());
-		rightPage.setRightSiblingId(page.getRightSiblingId());
-		page.setRightSiblingId(rightPage.getId());
-
-		if (!tuples.hasNext()) {
-			throw new DbException("No more tuples.");
+		if (!reverseIterator.hasNext()) {
+			throw new DbException("No more tuples");
 		}
+		Field key = rPage.iterator().next().getField(keyField);
+		BTreeEntry entry = new BTreeEntry(key, page.getId(), rPage.getId());
+		BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), key);
+		parent.insertEntry(entry);
+		updateParentPointers(tid, dirtypages, parent);
 
-		Field index = rightPage.iterator().next().getField(keyField);
-
-		BTreeEntry entry = new BTreeEntry(index, page.getId(), rightPage.getId());
-
-		BTreeInternalPage parentPage = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), index);
-		parentPage.insertEntry(entry);
-		updateParentPointers(tid, dirtypages, parentPage);
-
-		return (field.compare(Op.GREATER_THAN_OR_EQ, index) ? rightPage : page);
+		return (field.compare(Op.GREATER_THAN_OR_EQ, key) ? rPage : page);
 	}
 
 	/**
