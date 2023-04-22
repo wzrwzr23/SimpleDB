@@ -281,33 +281,40 @@ public class BTreeFile implements DbFile {
 		// the sibling pointers of all the affected leaf pages. Return the page into
 		// which a
 		// tuple with the given key field should be inserted.
-		BTreeLeafPage newLeafPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
-		Iterator<Tuple> it = page.reverseIterator();
-		int count = page.getNumTuples() / 2;
-		// move and delete half tuples
-		for (int i = 0; i < count; i++) {
-			Tuple cur = it.next();
-			page.deleteTuple(cur);
-			newLeafPage.insertTuple(cur);
+		BTreeLeafPage rPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+		BTreeLeafPageReverseIterator reverseIterator = (BTreeLeafPageReverseIterator) page.reverseIterator();
+		if (reverseIterator.hasNext() == false || reverseIterator == null) {
+			throw new DbException("No more tuples");
 		}
+		int numTuples = page.getNumTuples() / 2;
+		for (int i = 0; i < numTuples; ++i) {
+			if (reverseIterator.hasNext()) {
+				Tuple tuple = reverseIterator.next();
+				page.deleteTuple(tuple);
+				rPage.insertTuple(tuple);
+			} else {
+				throw new DbException("No more tuples");
+			}
+		}
+		if (page.getRightSiblingId() != null) {
+			BTreePageId lastRightId = page.getRightSiblingId();
+			BTreeLeafPage lastrPage = (BTreeLeafPage) getPage(tid, dirtypages, lastRightId, Permissions.READ_WRITE);
+			lastrPage.setLeftSiblingId(rPage.getId());
+		}
+		rPage.setLeftSiblingId(page.getId());
+		rPage.setRightSiblingId(page.getRightSiblingId());
+		page.setRightSiblingId(rPage.getId());
 
-		newLeafPage.setRightSiblingId(page.getRightSiblingId());
-		newLeafPage.setLeftSiblingId(page.getId());
-		page.setRightSiblingId(newLeafPage.getId());
+		if (!reverseIterator.hasNext()) {
+			throw new DbException("No more tuples");
+		}
+		Field key = rPage.iterator().next().getField(keyField);
+		BTreeEntry entry = new BTreeEntry(key, page.getId(), rPage.getId());
+		BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), key);
+		parent.insertEntry(entry);
+		updateParentPointers(tid, dirtypages, parent);
 
-		Field f = it.next().getField(keyField);
-		BTreeEntry newParentEntry = new BTreeEntry(f, page.getId(), newLeafPage.getId());
-		BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), f);
-		parent.insertEntry(newParentEntry);
-
-		updateParentPointer(tid, dirtypages, parent.getId(), page.getId());
-		updateParentPointer(tid, dirtypages, parent.getId(), newLeafPage.getId());
-
-		dirtypages.put(parent.getId(), parent);
-		dirtypages.put(page.getId(), page);
-		dirtypages.put(newLeafPage.getId(), newLeafPage);
-
-		return field.compare(Predicate.Op.GREATER_THAN, f) ? newLeafPage : page;
+		return (field.compare(Op.GREATER_THAN_OR_EQ, key) ? rPage : page);
 	}
 
 	/**
