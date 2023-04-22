@@ -698,32 +698,26 @@ public class BTreeFile implements DbFile {
 	 */
 	public void stealFromLeafPage(BTreeLeafPage page, BTreeLeafPage sibling,
 			BTreeInternalPage parent, BTreeEntry entry, boolean isRightSibling) throws DbException {
-		// some code goes here
-		//
 		// Move some of the tuples from the sibling to the page so
 		// that the tuples are evenly distributed. Be sure to update
 		// the corresponding parent entry.
-		Iterator<Tuple> tupleIterator;
-		if (isRightSibling)
-			tupleIterator = sibling.iterator();
-		else
-			tupleIterator = sibling.reverseIterator();
-
-		if (tupleIterator == null || tupleIterator.hasNext() == false) {
-			throw new DbException("No more tuples");
+		Iterator<Tuple> moveTuple = isRightSibling ? sibling.iterator() : sibling.reverseIterator();
+		if (moveTuple == null || !moveTuple.hasNext()) {
+			throw new DbException("Sibling has no tuples.");
 		}
 
-		int tupleNum = (sibling.getNumTuples() - page.getNumTuples()) / 2;
-		Tuple tuple = null;
-		for (int i = 0; i < tupleNum; ++i) {
-			tuple = tupleIterator.next();
-			sibling.deleteTuple(tuple);
-			page.insertTuple(tuple);
+		int numSteal = (sibling.getNumTuples() - page.getNumTuples()) / 2;
+		Tuple t = null;
+		for (int i = 0; i < numSteal; ++i) {
+			if (!moveTuple.hasNext()) {
+				throw new DbException("Sibling has no tuples.");
+			}
+			t = moveTuple.next();
+			sibling.deleteTuple(t);
+			page.insertTuple(t);
 		}
-		if (tuple == null) {
-			throw new DbException("No tuples When stealing from leaf page.");
-		}
-		entry.setKey(tuple.getField(this.keyField));
+		assert t != null;
+		entry.setKey(t.getField(keyField));
 		parent.updateEntry(entry);
 	}
 
@@ -812,31 +806,31 @@ public class BTreeFile implements DbFile {
 	public void stealFromLeftInternalPage(TransactionId tid, Map<PageId, Page> dirtypages,
 			BTreeInternalPage page, BTreeInternalPage leftSibling, BTreeInternalPage parent,
 			BTreeEntry parentEntry) throws DbException, TransactionAbortedException {
-		// some code goes here
 		// Move some of the entries from the left sibling to the page so
 		// that the entries are evenly distributed. Be sure to update
 		// the corresponding parent entry. Be sure to update the parent
 		// pointers of all children in the entries that were moved.
-		Iterator<BTreeEntry> bTreeEntryIterator = leftSibling.reverseIterator();
-		int numEntry = (leftSibling.getNumEntries() - page.getNumEntries()) / 2;
-
-		BTreeEntry move = bTreeEntryIterator.next();
-		BTreeEntry centre = new BTreeEntry(parentEntry.getKey(), move.getRightChild(),
-				page.iterator().next().getLeftChild());
-		page.insertEntry(centre);
-
-		for (int i = 0; i < numEntry - 1; ++i) {
-			if (bTreeEntryIterator.hasNext() == false) {
-				throw new DbException("No entries");
-			}
-			leftSibling.deleteKeyAndRightChild(move);
-			page.insertEntry(move);
-			move = bTreeEntryIterator.next();
+		if (leftSibling.getNumEntries() + page.getNumEntries() < page.getMaxEntries()) {
+			throw new DbException("Not enough tuples");
 		}
-		leftSibling.deleteKeyAndRightChild(move);
-		parentEntry.setKey(move.getKey());
-		parent.updateEntry(parentEntry);
-		updateParentPointers(tid, dirtypages, page);
+
+		Iterator<BTreeEntry> tupleIterator = leftSibling.reverseIterator();
+		while (tupleIterator.hasNext()) {
+			BTreeEntry nextEntry = tupleIterator.next();
+			BTreeEntry newBTreeEntry = new BTreeEntry(parentEntry.getKey(), nextEntry.getRightChild(),
+					page.iterator().next().getLeftChild());
+
+			page.insertEntry(newBTreeEntry);
+			leftSibling.deleteKeyAndRightChild(nextEntry);
+
+			parentEntry.setKey(nextEntry.getKey());
+			parent.updateEntry(parentEntry);
+			updateParentPointers(tid, dirtypages, page);
+
+			if (page.getNumEntries() >= leftSibling.getNumEntries()) {
+				break;
+			}
+		}
 	}
 
 	/**
@@ -864,31 +858,31 @@ public class BTreeFile implements DbFile {
 	public void stealFromRightInternalPage(TransactionId tid, Map<PageId, Page> dirtypages,
 			BTreeInternalPage page, BTreeInternalPage rightSibling, BTreeInternalPage parent,
 			BTreeEntry parentEntry) throws DbException, TransactionAbortedException {
-		// some code goes here
 		// Move some of the entries from the right sibling to the page so
 		// that the entries are evenly distributed. Be sure to update
 		// the corresponding parent entry. Be sure to update the parent
 		// pointers of all children in the entries that were moved.
-		Iterator<BTreeEntry> bTreeEntryIterator = rightSibling.iterator();
-		int numEntry = (rightSibling.getNumEntries() - page.getNumEntries()) / 2;
-
-		BTreeEntry nextTuple = bTreeEntryIterator.next();
-		BTreeEntry centre = new BTreeEntry(parentEntry.getKey(), page.reverseIterator().next().getRightChild(),
-				nextTuple.getLeftChild());
-		page.insertEntry(centre);
-
-		for (int i = 0; i < numEntry - 1; ++i) {
-			if (bTreeEntryIterator.hasNext() == false) {
-				throw new DbException("No tuples when stealing from right internal page.");
-			}
-			rightSibling.deleteKeyAndLeftChild(nextTuple);
-			page.insertEntry(nextTuple);
-			nextTuple = bTreeEntryIterator.next();
+		if (rightSibling.getNumEntries() + page.getNumEntries() < page.getMaxEntries()) {
+			throw new DbException("Not enough tuples");
 		}
-		rightSibling.deleteKeyAndLeftChild(nextTuple);
-		parentEntry.setKey(nextTuple.getKey());
-		parent.updateEntry(parentEntry);
-		updateParentPointers(tid, dirtypages, page);
+
+		Iterator<BTreeEntry> tupleIterator = rightSibling.iterator();
+		while (tupleIterator.hasNext()) {
+			BTreeEntry newEntry = tupleIterator.next();
+			BTreeEntry newBTreeEntry = new BTreeEntry(parentEntry.getKey(),
+					page.reverseIterator().next().getRightChild(), newEntry.getLeftChild());
+
+			page.insertEntry(newBTreeEntry);
+			rightSibling.deleteKeyAndLeftChild(newEntry);
+
+			parentEntry.setKey(newEntry.getKey());
+			parent.updateEntry(parentEntry);
+			updateParentPointers(tid, dirtypages, page);
+
+			if (page.getNumEntries() >= rightSibling.getNumEntries()) {
+				break;
+			}
+		}
 	}
 
 	/**
