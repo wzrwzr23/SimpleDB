@@ -706,23 +706,23 @@ public class BTreeFile implements DbFile {
 		// Move some of the tuples from the sibling to the page so
 		// that the tuples are evenly distributed. Be sure to update
 		// the corresponding parent entry.
-		Iterator<Tuple> moveTuple = isRightSibling ? sibling.iterator() : sibling.reverseIterator();
-		if (moveTuple == null || !moveTuple.hasNext()) {
+		Iterator<Tuple> nextTuple = isRightSibling ? sibling.iterator() : sibling.reverseIterator();
+		if (nextTuple.hasNext() == false || nextTuple == null) {
 			throw new DbException("Sibling has no tuples.");
 		}
 
-		int numSteal = (sibling.getNumTuples() - page.getNumTuples()) / 2;
-		Tuple t = null;
-		for (int i = 0; i < numSteal; ++i) {
-			if (!moveTuple.hasNext()) {
-				throw new DbException("Sibling has no tuples.");
+		int tupleToSteal = (sibling.getNumTuples() - page.getNumTuples()) / 2;
+		Tuple tuple = null;
+		for (int i = 0; i < tupleToSteal; ++i) {
+			if (nextTuple.hasNext() == false) {
+				throw new DbException("No tuples left.");
 			}
-			t = moveTuple.next();
-			sibling.deleteTuple(t);
-			page.insertTuple(t);
+			tuple = nextTuple.next();
+			sibling.deleteTuple(tuple);
+			page.insertTuple(tuple);
 		}
-		assert t != null;
-		entry.setKey(t.getField(keyField));
+		assert tuple != null;
+		entry.setKey(tuple.getField(keyField));
 		parent.updateEntry(entry);
 	}
 
